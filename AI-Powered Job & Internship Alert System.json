@@ -1,0 +1,736 @@
+{
+  "name": "AI-Powered Job & Internship Alert System",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -96,
+        112
+      ],
+      "id": "2d1089e8-123d-4b5f-bf97-683eeed668de",
+      "name": "When clicking ‘Execute workflow’"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1Jenu0kvHMLSIRJCLRTnEW1i94fZ1YlUKy8QI3lS-PcU",
+          "mode": "list",
+          "cachedResultName": "AI Job & Internship Alert System",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1Jenu0kvHMLSIRJCLRTnEW1i94fZ1YlUKy8QI3lS-PcU/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 1310252266,
+          "mode": "list",
+          "cachedResultName": "Preferences",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1Jenu0kvHMLSIRJCLRTnEW1i94fZ1YlUKy8QI3lS-PcU/edit#gid=1310252266"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        128,
+        -80
+      ],
+      "id": "403d926d-5a9e-4e17-b12a-0d2f47d261a2",
+      "name": "Get row(s) in sheet",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "ebqe4ObrdnhWB3nt",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "https://jsearch.p.rapidapi.com/search-v2",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "query",
+              "value": "AI Machine Learning Engineer jobs in India"
+            },
+            {
+              "name": "page",
+              "value": "1"
+            },
+            {
+              "name": "num_pages",
+              "value": "1"
+            },
+            {
+              "name": "country",
+              "value": "in"
+            },
+            {
+              "name": "date_posted",
+              "value": "week"
+            },
+            {
+              "name": "job_requirements",
+              "value": "no_experience"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-RapidAPI-Key",
+              "value": "6e53c55dc2msh029f6847fc5148ep1cf173jsne6858e2501bc"
+            },
+            {
+              "name": "X-RapidAPI-Host",
+              "value": "jsearch.p.rapidapi.com"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        352,
+        -80
+      ],
+      "id": "571f44bc-6ae9-4b98-9a78-8018d59ad277",
+      "name": "HTTP Request"
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst items = $input.all();\nconst results = [];\n\nfor (const item of items) {\n  const response = item.json;\n\n  // Your JSearch response contains jobs inside data.jobs.\n  const jobs = response.data?.jobs ?? [];\n\n  if (!Array.isArray(jobs)) {\n    continue;\n  }\n\n  for (const job of jobs) {\n    if (!job.job_title || !job.employer_name) {\n      continue;\n    }\n\n    results.push({\n      json: {\n        job_id: job.job_id ?? \"\",\n        job_title: job.job_title,\n        company: job.employer_name,\n        location: [\n          job.job_city,\n          job.job_state,\n          job.job_country\n        ].filter(Boolean).join(\", \"),\n        job_type: job.job_employment_type ?? \"\",\n        experience_level:\n          job.job_required_experience\n            ?.required_experience_in_months ?? null,\n        required_skills: \"\",\n        job_description: job.job_description ?? \"\",\n        application_url:\n          job.job_apply_link ?? job.job_google_link ?? \"\",\n        source: \"JSearch\",\n        posted_date: job.job_posted_at_datetime_utc ?? \"\",\n        date_found: new Date().toISOString(),\n        status: \"New\"\n      }\n    });\n  }\n}\n\nreturn results;\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        576,
+        -80
+      ],
+      "id": "95937857-4dff-45f6-a10d-71a51aa2062b",
+      "name": "Normalize Job Listings",
+      "executeOnce": true
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst items = $input.all();\nconst seen = new Set();\nconst uniqueJobs = [];\n\nfor (const item of items) {\n  const job = item.json;\n\n  // Prefer the API's unique job ID.\n  // Use a fallback key when an ID is unavailable.\n  const key = job.job_id\n    ? String(job.job_id).trim()\n    : [\n        job.job_title,\n        job.company,\n        job.location,\n        job.application_url\n      ]\n        .map(value => String(value ?? \"\").trim().toLowerCase())\n        .join(\"|\");\n\n  if (!key.replace(/\\|/g, \"\")) {\n    continue;\n  }\n\n  if (seen.has(key)) {\n    continue;\n  }\n\n  seen.add(key);\n  uniqueJobs.push({ json: job });\n}\n\nreturn uniqueJobs;\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        800,
+        -80
+      ],
+      "id": "e125ae85-cb7a-4f40-a25d-9ace4b48c3aa",
+      "name": "Remove Duplicate Jobs"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1Jenu0kvHMLSIRJCLRTnEW1i94fZ1YlUKy8QI3lS-PcU",
+          "mode": "list",
+          "cachedResultName": "AI Job & Internship Alert System",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1Jenu0kvHMLSIRJCLRTnEW1i94fZ1YlUKy8QI3lS-PcU/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Job Alerts",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1Jenu0kvHMLSIRJCLRTnEW1i94fZ1YlUKy8QI3lS-PcU/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Job ID": "={{ $json.job_id }}",
+            "Job Title": "={{ $json.job_title }}",
+            "Company": "={{ $json.company }}",
+            "Location": "={{ $json.location }}",
+            "Job Type": "={{ $json.job_type }}",
+            "Experience Level": "={{ $json.experience_level }}",
+            "Required Skills": "={{ $json.required_skills }}",
+            "Job Description": "={{ $json.job_description }}",
+            "Application URL": "={{ $json.application_url }}",
+            "Source": "={{ $json.source }}",
+            "Posted Date": "={{ $json.posted_date }}",
+            "Date Found": "={{ $json.date_found }}",
+            "Status": "={{ $json.status }}",
+            "AI Match Score": "={{ $json.match_score }}",
+            "AI Match Reason": "={{ $json.match_reason }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Job ID",
+              "displayName": "Job ID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Job Title",
+              "displayName": "Job Title",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Company",
+              "displayName": "Company",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Location",
+              "displayName": "Location",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Job Type",
+              "displayName": "Job Type",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Experience Level",
+              "displayName": "Experience Level",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Required Skills",
+              "displayName": "Required Skills",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Job Description",
+              "displayName": "Job Description",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Application URL",
+              "displayName": "Application URL",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Source",
+              "displayName": "Source",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Posted Date",
+              "displayName": "Posted Date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "AI Match Score",
+              "displayName": "AI Match Score",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "AI Match Reason",
+              "displayName": "AI Match Reason",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Date Found",
+              "displayName": "Date Found",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Status",
+              "displayName": "Status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        2720,
+        -80
+      ],
+      "id": "eb69ec12-6adf-4b0d-8148-571aec087e0b",
+      "name": "Save Jobs to Google Sheets",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "ebqe4ObrdnhWB3nt",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1Jenu0kvHMLSIRJCLRTnEW1i94fZ1YlUKy8QI3lS-PcU",
+          "mode": "list",
+          "cachedResultName": "AI Job & Internship Alert System",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1Jenu0kvHMLSIRJCLRTnEW1i94fZ1YlUKy8QI3lS-PcU/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Job Alerts",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1Jenu0kvHMLSIRJCLRTnEW1i94fZ1YlUKy8QI3lS-PcU/edit#gid=0"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        800,
+        160
+      ],
+      "id": "97add61a-47b5-4b06-bc6e-cb52168b81e4",
+      "name": "Read Existing Job IDs",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "ebqe4ObrdnhWB3nt",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        1024,
+        16
+      ],
+      "id": "1aa0ad4f-f013-44f4-8213-cefc518b2381",
+      "name": "Existing and New Jobs"
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst newItems = $(\"Remove Duplicate Jobs\").all();\nconst existingItems = $(\"Read Existing Job IDs\").all();\n\nfunction normalize(value) {\n  return String(value ?? \"\")\n    .toLowerCase()\n    .replace(/[^a-z0-9]+/g, \" \")\n    .trim()\n    .replace(/\\s+/g, \" \");\n}\n\nfunction getValue(job, ...fields) {\n  for (const field of fields) {\n    if (job[field] !== undefined &&\n        job[field] !== null &&\n        String(job[field]).trim() !== \"\") {\n      return job[field];\n    }\n  }\n  return \"\";\n}\n\nfunction makeTitleKey(job, titleField, companyField, locationField) {\n  const title = normalize(getValue(job, titleField));\n  const company = normalize(getValue(job, companyField));\n  const location = normalize(getValue(job, locationField));\n\n  if (!title || !company) return \"\";\n  return `${title}|${company}|${location}`;\n}\n\nfunction makeUrlKey(job, urlField) {\n  const raw = String(getValue(job, urlField)).trim();\n  if (!raw) return \"\";\n\n  try {\n    const url = new URL(raw);\n    return (url.hostname + url.pathname)\n      .toLowerCase()\n      .replace(/\\/+$/, \"\");\n  } catch {\n    return normalize(raw);\n  }\n}\n\nconst existingKeys = new Set();\nconst existingUrls = new Set();\n\nfor (const item of existingItems) {\n  const row = item.json;\n  const key = makeTitleKey(\n    row, \"Job Title\", \"Company\", \"Location\"\n  );\n  const url = makeUrlKey(row, \"Application URL\");\n\n  if (key) existingKeys.add(key);\n  if (url) existingUrls.add(url);\n}\n\nconst seenKeys = new Set();\nconst seenUrls = new Set();\nconst results = [];\n\nfor (const item of newItems) {\n  const job = item.json;\n  const key = makeTitleKey(\n    job, \"job_title\", \"company\", \"location\"\n  );\n  const url = makeUrlKey(job, \"application_url\");\n\n  if (!key) continue;\n  if (normalize(job.job_title).includes(\"junior data scientist\")) {\n  console.log(\"Incoming job:\", {\n    title: job.job_title,\n    company: job.company,\n    location: job.location,\n    key\n  });\n  console.log(\"Existing keys:\", [...existingKeys]);\n}\n  if (existingKeys.has(key)) continue;\n  if (url && existingUrls.has(url)) continue;\n  if (seenKeys.has(key)) continue;\n  if (url && seenUrls.has(url)) continue;\n\n  seenKeys.add(key);\n  if (url) seenUrls.add(url);\n\n  results.push({ json: job });\n}\n\nreturn results;\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1248,
+        16
+      ],
+      "id": "889418ba-9fb1-4c9e-8ed3-b85d46c81442",
+      "name": "Filter Previously Saved Job"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=You are an AI job-matching assistant.\n\nEvaluate the following job against these candidate preferences:\n- Target roles: AI/ML Engineer, Software Engineer, Data Analyst\n- Opportunity types: Full-time and Internship\n- Preferred location: India\n- Experience level: Fresher or 0–2 years\n\nJob details:\nTitle: {{ $json.job_title }}\nCompany: {{ $json.company }}\nLocation: {{ $json.location }}\nJob type: {{ $json.job_type }}\nExperience level: {{ $json.experience_level }}\nRequired skills: {{ $json.required_skills }}\nDescription: {{ $json.job_description }}\n\nEvaluate role relevance, location, employment type, experience requirements, and skills. Do not assume missing information is confirmed. Penalize clear mismatches and use a neutral score when details are insufficient.\n\nReturn ONLY valid JSON in this exact format:\n{\n  \"match_score\": 0,\n  \"match_reason\": \"Brief explanation of the score\"\n}\n\nThe match_score must be an integer from 0 to 100. Keep match_reason concise.",
+        "batching": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [
+        1696,
+        -112
+      ],
+      "id": "46c419cb-b8bd-4f47-99f3-dfe178a55b9e",
+      "name": "Basic LLM Chain"
+    },
+    {
+      "parameters": {
+        "modelName": "models/gemini-3.1-flash-lite",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1.2,
+      "position": [
+        1776,
+        128
+      ],
+      "id": "b1cb46cb-18d6-48c4-99cd-5cb74284d202",
+      "name": "Google Gemini Chat Model",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "MlpUOcH6ExAyGCx6",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "\nreturn {\n  json: {\n    job_id: $json[\"Job ID\"] ?? $json.job_id ?? \"\",\n    job_title: $json[\"Job Title\"] ?? $json.job_title ?? \"\",\n    company: $json[\"Company\"] ?? $json.company ?? \"\",\n    location: $json[\"Location\"] ?? $json.location ?? \"\",\n    job_type: $json[\"Job Type\"] ?? $json.job_type ?? \"\",\n    experience_level: $json[\"Experience Level\"] ?? $json.experience_level ?? \"\",\n    required_skills: $json[\"Required Skills\"] ?? $json.required_skills ?? \"\",\n    job_description: $json[\"Job Description\"] ?? $json.job_description ?? \"\",\n    application_url: $json[\"Application URL\"] ?? $json.application_url ?? \"\",\n    source: $json[\"Source\"] ?? $json.source ?? \"\",\n    posted_date: $json[\"Posted Date\"] ?? $json.posted_date ?? \"\",\n    date_found: $json[\"Date Found\"] ?? $json.date_found ?? \"\",\n    status: $json[\"Status\"] ?? $json.status ?? \"New\"\n  }\n};\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1472,
+        16
+      ],
+      "id": "d13f5909-07d9-41ca-afe3-4c40ec3daeaf",
+      "name": "Prepare Job for AI Matching"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "\nconst response = $json.text ?? \"\";\n\nconst cleaned = response\n  .replace(/```json/gi, \"\")\n  .replace(/```/g, \"\")\n  .trim();\n\nlet parsed;\n\ntry {\n  parsed = JSON.parse(cleaned);\n} catch (error) {\n  throw new Error(\n    \"Gemini did not return valid JSON. Response: \" + response\n  );\n}\n\nconst score = Number(parsed.match_score);\nconst reason = String(parsed.match_reason ?? \"\").trim();\n\nif (!Number.isInteger(score) || score < 0 || score > 100) {\n  throw new Error(\"Gemini returned an invalid match score.\");\n}\n\nreturn {\n  json: {\n    match_score: score,\n    match_reason: reason\n  }\n};\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2048,
+        -112
+      ],
+      "id": "ac6c48d2-d52f-44b4-b48e-1cc424897fc9",
+      "name": "Parse AI Match Result"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        2272,
+        16
+      ],
+      "id": "c6cea95c-f67f-4e9a-87ea-ff27b2d98d9b",
+      "name": "Merge Job Details and AI Score"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "5832f560-6fcc-4dd7-b4d2-f8bd6acccbac",
+              "leftValue": "={{ $json.match_score }}",
+              "rightValue": 70,
+              "operator": {
+                "type": "number",
+                "operation": "gte"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2.3,
+      "position": [
+        2496,
+        16
+      ],
+      "id": "1e507c78-a292-4391-9b0a-319d96ca9614",
+      "name": "Filter AI Match Score >= 70"
+    },
+    {
+      "parameters": {
+        "chatId": "1559820121",
+        "text": "=🚀 NEW AI JOB ALERT\n\n💼 Job Title: {{ $json.job_title }}\n🏢 Company: {{ $json.company }}\n📍 Location: {{ $json.location }}\n📝 Job Type: {{ $json.job_type }}\n🎯 AI Match Score: {{ $json.match_score }}/100\n\n💡 Why it matches:\n{{ $json.match_reason }}\n\n🔗 Apply Here: {{ $json.application_url }}\n\n📅 Posted Date: {{ $json.posted_date }}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        2720,
+        112
+      ],
+      "id": "17f80e7f-26d1-462b-871d-20f0b7362cce",
+      "name": "Send a text message",
+      "webhookId": "8c3e4d14-54ef-445b-b08d-785a39fbffa0",
+      "credentials": {
+        "telegramApi": {
+          "id": "lFMHxVeGutcNXjXX",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 9
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.4,
+      "position": [
+        -96,
+        -128
+      ],
+      "id": "2d57bd9c-ad55-494d-a243-00a1e5da108b",
+      "name": "Schedule Trigger"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        [
+          {
+            "node": "Get row(s) in sheet",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Read Existing Job IDs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get row(s) in sheet": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Normalize Job Listings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Job Listings": {
+      "main": [
+        [
+          {
+            "node": "Remove Duplicate Jobs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Remove Duplicate Jobs": {
+      "main": [
+        [
+          {
+            "node": "Existing and New Jobs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Existing Job IDs": {
+      "main": [
+        [
+          {
+            "node": "Existing and New Jobs",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Existing and New Jobs": {
+      "main": [
+        [
+          {
+            "node": "Filter Previously Saved Job",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Previously Saved Job": {
+      "main": [
+        [
+          {
+            "node": "Prepare Job for AI Matching",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Jobs to Google Sheets": {
+      "main": [
+        []
+      ]
+    },
+    "Google Gemini Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Job for AI Matching": {
+      "main": [
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge Job Details and AI Score",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Basic LLM Chain": {
+      "main": [
+        [
+          {
+            "node": "Parse AI Match Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse AI Match Result": {
+      "main": [
+        [
+          {
+            "node": "Merge Job Details and AI Score",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge Job Details and AI Score": {
+      "main": [
+        [
+          {
+            "node": "Filter AI Match Score >= 70",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter AI Match Score >= 70": {
+      "main": [
+        [
+          {
+            "node": "Save Jobs to Google Sheets",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Send a text message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Get row(s) in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "170cefcb-86d8-4c82-8bbd-37bb036d4d50",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "5531a67bb9ca29a24620543847cf2c2332cda8a9cb9301d34bc354812fb81660"
+  },
+  "nodeGroups": [],
+  "id": "fuLibe8rBG65szr0",
+  "tags": []
+}
